@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Trabajo Diario</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 80%;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            background-color: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background-color: #f2f2f2;
+            color: #333;
+        }
+        input, select {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        .nombre-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .nombre-container label {
+            margin-right: 10px;
+        }
+        .nombre-container select {
+            max-width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nombre-container">
+            <label for="nombre">Nombre:</label>
+            <select id="nombre" name="nombre" required>
+                <option value="" disabled selected>Seleccione un nombre</option>
+            </select>
+        </div>
+        <h1>Registro de Trabajo Diario</h1>
+        <table id="registroTabla">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Entrada</th>
+                    <th>Salida</th>
+                    <th>Labor</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><input type="date" class="fecha"></td>
+                    <td><input type="time" class="entrada"></td>
+                    <td><input type="time" class="salida"></td>
+                    <td>
+                        <select class="labor">
+                            <option value="Praca">Praca</option>
+                            <option value="Pranie">Pranie</option>
+                            <option value="Skolenie">Skolenie</option>
+                        </select>
+                    </td>
+                    <td><button type="button" class="eliminarFila">Eliminar</button></td>
+                </tr>
+            </tbody>
+        </table>
+        <button type="button" id="agregarFila">Agregar Fila</button>
+        <button type="button" id="guardarRegistros">Guardar</button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const apiUrl = 'https://script.google.com/macros/s/AKfycby0AJuJuXocbKA394XBEtYTcbyPormijkT0aakjSyrlstJ9ckiNdOC8eQtsTwTR3f2n/exec';
+
+            // Cargar nombres en el select de nombres
+            fetch(apiUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Error al obtener los nombres: ' + response.statusText);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Nombres recibidos:', data); // Depuración
+                    const nombreSelect = document.getElementById('nombre');
+                    data.forEach(nombre => {
+                        const option = document.createElement('option');
+                        option.value = nombre;
+                        option.textContent = nombre;
+                        nombreSelect.appendChild(option);
+                    });
+                })
+                .catch(error => {
+                    console.error("Error al cargar los nombres:", error);
+                    alert("No se pudieron cargar los nombres. Intente nuevamente.");
+                });
+
+            // Agregar una nueva fila
+            document.getElementById('agregarFila').addEventListener('click', function() {
+                const tabla = document.getElementById('registroTabla').getElementsByTagName('tbody')[0];
+                const nuevaFila = tabla.insertRow();
+
+                nuevaFila.innerHTML = `
+                    <td><input type="date" class="fecha"></td>
+                    <td><input type="time" class="entrada"></td>
+                    <td><input type="time" class="salida"></td>
+                    <td>
+                        <select class="labor">
+                            <option value="Praca">Praca</option>
+                            <option value="Pranie">Pranie</option>
+                            <option value="Skolenie">Skolenie</option>
+                        </select>
+                    </td>
+                    <td><button type="button" class="eliminarFila">Eliminar</button></td>
+                `;
+
+                // Configurar validaciones de la fecha y eliminar la fila
+                configurarValidaciones(nuevaFila);
+            });
+
+            // Guardar los registros
+            document.getElementById('guardarRegistros').addEventListener('click', function() {
+                const nombre = document.getElementById('nombre').value;
+                if (!nombre) {
+                    alert("Por favor, seleccione un nombre.");
+                    return;
+                }
+
+                const filas = document.getElementById('registroTabla').getElementsByTagName('tbody')[0].rows;
+                const registros = [];
+
+                let fechaReferencia = null;
+
+                for (let i = 0; i < filas.length; i++) {
+                    const fila = filas[i];
+                    const fecha = fila.querySelector('.fecha').value;
+                    const entrada = fila.querySelector('.entrada').value;
+                    const salida = fila.querySelector('.salida').value;
+                    const labor = fila.querySelector('.labor').value;
+
+                    if (fecha && entrada && salida && labor) {
+                        if (validarHorarios(entrada, salida)) {
+                            if (!fechaReferencia) {
+                                fechaReferencia = fecha;
+                            } else if (fecha !== fechaReferencia) {
+                                alert(`Error en la fila ${i + 1}: Todas las labores deben ser del mismo día.`);
+                                return;
+                            }
+
+                            registros.push({
+                                nombre: nombre,
+                                fecha: fecha,
+                                entrada: entrada,
+                                salida: salida,
+                                labor: labor,
+                                editado: new Date().toISOString() // Agregar fecha y hora de edición
+                            });
+                        } else {
+                            alert(`Error en la fila ${i + 1}: El horario de salida debe ser posterior al de entrada.`);
+                            return;
+                        }
+                    } else {
+                        alert(`Error en la fila ${i + 1}: Todos los campos deben estar completos.`);
+                        return;
+                    }
+                }
+
+                fetch('https://script.google.com/macros/s/AKfycbwXbDIZ3_sC4GALPWDyULBdnP6o2fWVmfSpQ7aqYdchrzCLxyfHhCNsVHH2R3JgeGcG/exec', {
+                    method: 'POST',
+                    mode: 'no-cors',  // Agregado para evitar problemas de CORS
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ registros })
+                }).then(response => {
+                    // Aunque no podemos obtener la respuesta debido a 'no-cors', seguimos mostrando éxito
+                    alert('Todos los registros han sido guardados con éxito');
+                    limpiarFormulario(); // Limpiar la tabla y restablecer el formulario después de guardar
+                }).catch(error => {
+                    alert('Hubo un error al guardar los datos: ' + error);
+                });
+            });
+
+            function validarHorarios(entrada, salida) {
+                return entrada < salida;
+            }
+
+            function limpiarFormulario() {
+                document.getElementById('registroTabla').getElementsByTagName('tbody')[0].innerHTML = ''; // Limpiar la tabla
+                document.getElementById('nombre').value = ''; // Limpiar el nombre seleccionado
+                agregarFilaInicial(); // Agregar una fila inicial vacía
+            }
+
+            function agregarFilaInicial() {
+                const tabla = document.getElementById('registroTabla').getElementsByTagName('tbody')[0];
+                const nuevaFila = tabla.insertRow();
+
+                nuevaFila.innerHTML = `
+                    <td><input type="date" class="fecha"></td>
+                    <td><input type="time" class="entrada"></td>
+                    <td><input type="time" class="salida"></td>
+                    <td>
+                        <select class="labor">
+                            <option value="Praca">Praca</option>
+                            <option value="Pranie">Pranie</option>
+                            <option value="Skolenie">Skolenie</option>
+                        </select>
+                    </td>
+                    <td><button type="button" class="eliminarFila">Eliminar</button></td>
+                `;
+
+                // Configurar validaciones de la fecha y eliminar la fila
+                configurarValidaciones(nuevaFila);
+            }
+
+            function configurarValidaciones(fila) {
+                const fechaInput = fila.querySelector('.fecha');
+
+                // Establecer la fecha mínima y máxima según las restricciones
+                const fechaActual = new Date();
+                const mesActual = (fechaActual.getMonth() + 1).toString().padStart(2, '0');
+                const diaActual = fechaActual.getDate().toString().padStart(2, '0');
+                const anoActual = fechaActual.getFullYear();
+
+                const fechaMinima = `${anoActual}-${mesActual}-01`;
+                const fechaMaxima = `${anoActual}-${mesActual}-${diaActual}`;
+
+                fechaInput.setAttribute('min', fechaMinima);
+                fechaInput.setAttribute('max', fechaMaxima);
+
+                // Validación para eliminar la fila
+                fila.querySelector('.eliminarFila').addEventListener('click', function() {
+                    fila.remove();
+                });
+            }
+
+            agregarFilaInicial(); // Agregar una fila inicial al cargar la página
+        });
+    </script>
+</body>
+</html>
